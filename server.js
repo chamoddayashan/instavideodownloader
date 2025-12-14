@@ -20,9 +20,8 @@ app.post('/api/download', async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid URL provided." });
         }
 
-        console.log("Processing via SafeSite API:", url);
+        console.log("Processing URL:", url);
 
-        // 1. Prepare Request (This API uses GET /convert)
         const options = {
             method: 'GET',
             url: `https://${RAPID_API_HOST}/convert`,
@@ -33,47 +32,43 @@ app.post('/api/download', async (req, res) => {
             }
         };
 
-        // 2. Send Request
         const response = await axios.request(options);
         const data = response.data;
         
-        console.log("API Response:", JSON.stringify(data)); // See what we get in logs
+        // Log the exact response to see what we get
+        console.log("API Response:", JSON.stringify(data));
 
-        // 3. Check for errors
-        if (!data) {
-             return res.status(404).json({ success: false, message: "No data returned." });
-        }
-        
-        // If the API returns an error message
-        if (data.error) {
-             return res.status(400).json({ success: false, message: "API Error: " + data.message || "Unknown Error" });
-        }
+        // --- FIXED PARSING LOGIC BASED ON YOUR LOGS ---
+        let downloadUrl = null;
+        let thumbUrl = "https://via.placeholder.com/600x600?text=Instagram+Video";
 
-        // 4. Extract Video URL
-        // This specific API usually returns { url: "..." } or an array of results
-        let downloadUrl = data.url; 
-        let thumbUrl = data.thumb || "https://via.placeholder.com/600x600?text=Instagram+Video";
-
-        // Handle case where it returns an array (like a carousel)
-        if (Array.isArray(data) && data.length > 0) {
-            downloadUrl = data[0].url;
-            thumbUrl = data[0].thumb || thumbUrl;
+        // 1. Check if it's inside "media" array (This matches your log!)
+        if (data.media && Array.isArray(data.media) && data.media.length > 0) {
+            downloadUrl = data.media[0].url;
+            thumbUrl = data.media[0].thumbnail || thumbUrl;
+        } 
+        // 2. Fallback: Check if it's directly at the root (Some videos differ)
+        else if (data.url) {
+            downloadUrl = data.url;
+            thumbUrl = data.thumb || thumbUrl;
         }
 
+        // 3. Handle "Media not available" error
         if (!downloadUrl) {
-            return res.status(404).json({ success: false, message: "Video link not found. Account might be private." });
+            console.error("No URL found in data:", data);
+            return res.status(404).json({ success: false, message: "Video not found. The account might be private." });
         }
 
-        // 5. Success
+        // Success!
         res.json({
             success: true,
-            title: data.meta?.title || "Instagram Video",
+            title: "Instagram Video",
             thumbnail: thumbUrl,
             downloadUrl: downloadUrl
         });
 
     } catch (error) {
-        console.error("RapidAPI Error:", error.response ? error.response.data : error.message);
+        console.error("Server Error:", error.response ? error.response.data : error.message);
         res.status(500).json({ success: false, message: "Server Error. Please try again." });
     }
 });

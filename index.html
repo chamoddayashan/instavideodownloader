@@ -182,7 +182,7 @@
 
         <div id="result-area">
             <div class="video-card">
-               
+               <img src="" id="videoThumb" alt="Instagram Video Thumbnail">
                 <h3 id="videoTitle" style="margin-bottom: 10px;">Instagram Video</h3>
                 <a href="#" class="download-btn" id="downloadLink" target="_blank">Download .MP4</a>
             </div>
@@ -200,42 +200,47 @@
         </div>
     </footer>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const btn = document.getElementById('downloadBtn');
-            const input = document.getElementById('urlInput');
-            const resultArea = document.getElementById('result-area');
-            const errorMsg = document.getElementById('error-msg');
-            
-            // Progress Bar Elements
-            const progressContainer = document.getElementById('progressContainer');
-            const progressBar = document.getElementById('progressBar');
+   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Get Elements
+        const btn = document.getElementById('downloadBtn');
+        const input = document.getElementById('urlInput');
+        const resultArea = document.getElementById('result-area');
+        const errorMsg = document.getElementById('error-msg');
+        
+        // Progress Bar Elements
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
 
-            // Result Elements
-            const videoThumb = document.getElementById('videoThumb');
-            const videoTitle = document.getElementById('videoTitle');
-            const downloadLink = document.getElementById('downloadLink');
+        // Result Elements
+        const videoThumb = document.getElementById('videoThumb');
+        const videoTitle = document.getElementById('videoTitle');
+        const downloadLink = document.getElementById('downloadLink');
 
-            let progressInterval = null;
+        // --- DEBUGGING CHECK ---
+        // This will tell you if your HTML is missing something
+        if (!videoThumb) console.error("CRITICAL ERROR: Could not find <img id='videoThumb'> in HTML");
+        if (!resultArea) console.error("CRITICAL ERROR: Could not find <div id='result-area'> in HTML");
+        // -----------------------
 
+        let progressInterval = null;
+
+        if (btn) {
             btn.addEventListener('click', async () => {
                 const url = input.value.trim();
 
-                // 1. Reset Interface
                 resetUI();
 
-                // 2. Validate
                 if (!url || !url.includes('instagram.com')) {
                     showError("Please paste a valid Instagram link.");
                     return;
                 }
 
-                // 3. Start Loading Animation
                 startProgress();
 
                 try {
-                    // 4. Call Your Railway Server
-                    const response = await fetch('https://instavideodownloader-production.up.railway.app/api/download', {
+                    // USE YOUR RAILWAY URL HERE
+                    const response = await fetch('https://YOUR-RAILWAY-APP-URL.up.railway.app/api/download', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: url })
@@ -247,81 +252,93 @@
                         throw new Error(data.message || "Failed to download");
                     }
 
-                    // 5. Complete Loading (Fill Bar to 100%)
                     finishProgress();
 
-                    // 6. Update UI with Data
-                    // Add a small delay so user sees the bar hit 100% before showing result
                     setTimeout(() => {
-                        const thumb = data.thumbnail || "https://via.placeholder.com/600x600?text=No+Preview";
-                        videoThumb.src = thumb;
-                        videoTitle.innerText = data.title || "Instagram Video"; 
-                        downloadLink.href = data.downloadUrl;
+                        // Check if elements exist before using them to prevent crash
+                        if (videoThumb) videoThumb.src = data.thumbnail || "https://via.placeholder.com/600x600?text=No+Preview";
+                        if (videoTitle) videoTitle.innerText = data.title || "Instagram Video"; 
+                        if (downloadLink) downloadLink.href = data.downloadUrl;
                         
-                        // Show the card
-                        resultArea.style.display = 'block';
-                        resultArea.scrollIntoView({ behavior: 'smooth' });
+                        if (resultArea) {
+                            resultArea.style.display = 'block';
+                            resultArea.scrollIntoView({ behavior: 'smooth' });
+                        }
                     }, 500);
 
                 } catch (err) {
                     console.error(err);
-                    stopProgress(); // Hide bar immediately on error
-                    showError(err.message || "Failed to fetch video. Ensure the account is public.");
+                    stopProgress();
+                    showError(err.message || "Failed to fetch video.");
                 }
             });
+        }
 
-            // --- HELPER FUNCTIONS ---
+        // --- HELPER FUNCTIONS ---
 
-            function startProgress() {
+        function startProgress() {
+            if (btn) {
                 btn.disabled = true;
                 btn.innerText = "Processing...";
+            }
+            if (progressContainer) {
                 progressContainer.style.display = 'block';
-                progressBar.style.width = '0%';
-                
-                // Simulate progress up to 90%
-                let width = 0;
-                progressInterval = setInterval(() => {
-                    if (width >= 90) {
-                        clearInterval(progressInterval);
-                    } else {
-                        width += Math.random() * 10; // Random increment
-                        if (width > 90) width = 90;
-                        progressBar.style.width = width + '%';
-                    }
-                }, 300);
+                if (progressBar) progressBar.style.width = '0%';
             }
+            
+            let width = 0;
+            progressInterval = setInterval(() => {
+                if (width >= 90) {
+                    clearInterval(progressInterval);
+                } else {
+                    width += Math.random() * 10;
+                    if (progressBar) progressBar.style.width = width + '%';
+                }
+            }, 300);
+        }
 
-            function finishProgress() {
-                clearInterval(progressInterval);
-                progressBar.style.width = '100%';
-                btn.innerText = "Downloaded!";
-                setTimeout(() => {
-                     btn.disabled = false;
-                     btn.innerText = "Download";
-                     progressContainer.style.display = 'none'; // Hide bar after success
-                }, 1000);
-            }
+        function finishProgress() {
+            clearInterval(progressInterval);
+            if (progressBar) progressBar.style.width = '100%';
+            if (btn) btn.innerText = "Downloaded!";
+            setTimeout(() => {
+                 if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "Download";
+                 }
+                 if (progressContainer) progressContainer.style.display = 'none';
+            }, 1000);
+        }
 
-            function stopProgress() {
-                clearInterval(progressInterval);
-                progressContainer.style.display = 'none';
+        function stopProgress() {
+            clearInterval(progressInterval);
+            if (progressContainer) progressContainer.style.display = 'none';
+            if (btn) {
                 btn.disabled = false;
                 btn.innerText = "Download";
             }
+        }
 
-            function resetUI() {
-                errorMsg.style.display = 'none';
-                resultArea.style.display = 'none';
-                videoThumb.src = "";
-            }
+        function resetUI() {
+            if (errorMsg) errorMsg.style.display = 'none';
+            if (resultArea) resultArea.style.display = 'none';
+            
+            // THIS IS WHERE YOUR ERROR WAS
+            // We add a check "if (videoThumb)" so it skips it if missing, instead of crashing.
+            if (videoThumb) videoThumb.src = ""; 
+        }
 
-            function showError(msg) {
+        function showError(msg) {
+            if (errorMsg) {
                 errorMsg.innerText = msg;
                 errorMsg.style.display = 'block';
+            }
+            if (input) {
                 input.style.border = "1px solid #ff4b4b";
                 setTimeout(() => input.style.border = "none", 500);
             }
-        });
-    </script>
+        }
+    });
+</script>
 </body>
 </html>

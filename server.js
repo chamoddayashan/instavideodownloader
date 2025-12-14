@@ -1,14 +1,16 @@
 const express = require('express');
 const cors = require('cors');
-// --- FIX: robust import that handles both styles ---
-const getInstagramMedia = require("instagram-url-direct");
-const instagramGetUrl = getInstagramMedia.default || getInstagramMedia; 
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+// --- YOUR API CONFIGURATION ---
+const RAPID_API_KEY = '91bdc61f0amshcf872cf065a3b49p19f91fjsnf3bec9e40db4';
+const RAPID_API_HOST = 'instagram-downloader-download-instagram-videos-stories.p.rapidapi.com';
 
 app.post('/api/download', async (req, res) => {
     try {
@@ -18,30 +20,52 @@ app.post('/api/download', async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid URL provided." });
         }
 
-        console.log("Processing URL:", url);
+        console.log("Processing via RapidAPI:", url);
 
-        // Call the library function
-        const links = await instagramGetUrl(url);
+        // 1. Prepare the request options
+        const options = {
+            method: 'GET',
+            url: `https://${RAPID_API_HOST}/index`,
+            params: { url: url },
+            headers: {
+                'x-rapidapi-key': RAPID_API_KEY,
+                'x-rapidapi-host': RAPID_API_HOST
+            }
+        };
 
-        console.log("Instagram Response:", links); // Log the result for debugging
+        // 2. Send request to RapidAPI
+        const response = await axios.request(options);
+        const data = response.data;
 
-        if (!links || links.results_number === 0) {
-            return res.status(404).json({ success: false, message: "Media not found. Account might be private." });
+        // 3. Log data to Railway logs (helps for debugging)
+        console.log("API Response:", JSON.stringify(data));
+
+        // 4. Check if video exists
+        // This specific API usually returns 'media' as a URL string or an array
+        if (!data || (!data.media && !data.video)) {
+             return res.status(404).json({ success: false, message: "Video not found. Account might be private." });
         }
 
-        // Get the first video URL
-        const videoData = links.url_list[0];
+        // Logic to extract the video link
+        let downloadUrl = data.media; // Primary location
+        if (Array.isArray(data.media)) {
+            downloadUrl = data.media[0]; // If it's a list, take the first one
+        } else if (!downloadUrl && data.video) {
+            downloadUrl = data.video; // Fallback for some endpoints
+        }
 
+        // 5. Send success response back to Frontend
         res.json({
             success: true,
-            title: "Instagram Video", 
-            thumbnail: "https://via.placeholder.com/600x600?text=Instagram+Video", 
-            downloadUrl: videoData
+            title: data.title || "Instagram Video",
+            thumbnail: data.thumbnail || "https://via.placeholder.com/600x600?text=Instagram+Video",
+            downloadUrl: downloadUrl
         });
 
     } catch (error) {
-        console.error("Server Error:", error);
-        res.status(500).json({ success: false, message: "Failed to process video. Server Error." });
+        // Detailed error logging
+        console.error("RapidAPI Error:", error.response ? error.response.data : error.message);
+        res.status(500).json({ success: false, message: "Failed to fetch video. Please try again." });
     }
 });
 
